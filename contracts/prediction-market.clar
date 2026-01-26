@@ -149,6 +149,7 @@
         (
             (market (unwrap! (map-get? markets market-id) ERR-MARKET-NOT-FOUND))
             (current-stats (get-user-stats tx-sender))
+            (contract-address (as-contract tx-sender))
         )
         ;; Validations
         (asserts! (is-eq (get status market) "OPEN") ERR-MARKET-CLOSED)
@@ -157,7 +158,7 @@
         (asserts! (> amount u0) ERR-INSUFFICIENT-FUNDS)
 
         ;; Transfer STX to contract
-        (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
+        (try! (stx-transfer? amount tx-sender contract-address))
 
         ;; Update Market
         (let
@@ -220,9 +221,10 @@
                         ;; Ensure treasury can pay bonus, otherwise 0
                         (actual-bonus (if (>= (var-get treasury-balance) bonus) bonus u0))
                         (total-payout (+ share actual-bonus))
+                        (claimer tx-sender)
                     )
                     ;; Transfer Payout
-                    (try! (as-contract (stx-transfer? total-payout tx-sender (get user bet))))
+                    (try! (as-contract (stx-transfer? total-payout tx-sender claimer)))
                     
                     ;; Update Treasury if bonus paid
                     (if (> actual-bonus u0)
@@ -258,8 +260,11 @@
 
 ;; Admin - Fund Treasury for Multipliers
 (define-public (fund-treasury (amount uint))
-    (begin
-        (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
+    (let
+        (
+            (contract-address (as-contract tx-sender))
+        )
+        (try! (stx-transfer? amount tx-sender contract-address))
         (var-set treasury-balance (+ (var-get treasury-balance) amount))
         (ok true)
     )
