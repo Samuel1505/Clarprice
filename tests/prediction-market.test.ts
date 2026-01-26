@@ -111,24 +111,26 @@ describe('Prediction Market Contract', () => {
 
     // 4th Win -> calculated details
     // Market 4
-    simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("TEST"), Cl.stringAscii("Q"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(10000)], deployer);
+    const create = simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("TEST"), Cl.stringAscii("Q"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(10000)], deployer);
+    // @ts-ignore
+    const marketId = create.result.value as CV;
     // Bet 1000 vs 1000 (total 2000)
-    simnet.callPublicFn(contract, "place-bet", [Cl.uint(4), Cl.stringAscii("A"), Cl.uint(1000)], wallet1);
-    simnet.callPublicFn(contract, "place-bet", [Cl.uint(4), Cl.stringAscii("B"), Cl.uint(1000)], wallet2); // Add loser to ensure pool is distinct
-    simnet.callPublicFn(contract, "resolve-market", [Cl.uint(4), Cl.stringAscii("A")], deployer);
+    simnet.callPublicFn(contract, "place-bet", [marketId, Cl.stringAscii("A"), Cl.uint(1000)], wallet1);
+    simnet.callPublicFn(contract, "place-bet", [marketId, Cl.stringAscii("B"), Cl.uint(1000)], wallet2); // Add loser to ensure pool is distinct
+    simnet.callPublicFn(contract, "resolve-market", [marketId, Cl.stringAscii("A")], deployer);
 
     // Claim. Streak becomes 4. Multiplier is still for "4 / 3 = 1" -> 10%.
     // Base Share = 2000.
     // Bonus = (2000 * 10) / 100 = 200.
     // Total Payout = 2200.
     // Previous earnings (assuming previous mkts had no other bets, so 1000->1000 payout? No, if only 1 bettor, pool is just theirs, payout=bet)
-    // Actually in loop above: 
+    // Actually in loop above:
     // Market 1: Bet 1000. Pool 1000. Win 1000. (Streak 1, bonus 0)
     // ...
     // Total earnings from first 3 = 3000.
     // This claim adds 2200. Total = 5200.
 
-    const claim = simnet.callPublicFn(contract, "claim-winnings", [Cl.uint(4)], wallet1);
+    const claim = simnet.callPublicFn(contract, "claim-winnings", [marketId], wallet1);
     expect(claim).toBeOk(Cl.bool(true));
 
     const finalStats = simnet.callReadOnlyFn(contract, "get-user-stats", [wallet1], deployer);
@@ -140,5 +142,4 @@ describe('Prediction Market Contract', () => {
       "total-earnings": Cl.uint(5200)
     }));
   });
-
 });
