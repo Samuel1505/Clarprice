@@ -68,4 +68,9 @@ plan:
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: contracts/predict.clar
             clarity-version: 4
+        - emulated-contract-publish:
+            contract-name: prediction-market
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: contracts/prediction-market.clar
+            clarity-version: 4
       epoch: "3.3"

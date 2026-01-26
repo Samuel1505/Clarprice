@@ -1,0 +1,25 @@
+---
+id: 0
+name: Mainnet deployment
+network: mainnet
+stacks-node: "https://api.hiro.so"
+bitcoin-node: "http://blockstack:blockstacksystem@bitcoin.blockstack.com:8332"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - contract-publish:
+            contract-name: predict
+            expected-sender: SP1ZE73TWJ4WBFHZBBQJAMJDV23K678RXWPDGNHYF
+            cost: 2250
+            path: contracts/predict.clar
+            anchor-block-only: true
+            clarity-version: 4
+        - contract-publish:
+            contract-name: prediction-market
+            expected-sender: SP1ZE73TWJ4WBFHZBBQJAMJDV23K678RXWPDGNHYF
+            cost: 90780
+            path: contracts/prediction-market.clar
+            anchor-block-only: true
+            clarity-version: 4
+      epoch: "3.3"
