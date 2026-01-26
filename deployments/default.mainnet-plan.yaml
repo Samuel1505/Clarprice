@@ -14,12 +14,12 @@ plan:
             cost: 2250
             path: contracts/predict.clar
             anchor-block-only: true
-            clarity-version: 4
+            clarity-version: 2
         - contract-publish:
             contract-name: prediction-market
             expected-sender: SP1ZE73TWJ4WBFHZBBQJAMJDV23K678RXWPDGNHYF
-            cost: 90780
+            cost: 97070
             path: contracts/prediction-market.clar
             anchor-block-only: true
-            clarity-version: 4
-      epoch: "3.3"
+            clarity-version: 2
+      epoch: "2.5"
