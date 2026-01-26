@@ -21,7 +21,7 @@ describe('Prediction Market Contract', () => {
         Cl.stringAscii("Will BTC hit 100k?"),
         Cl.stringAscii("YES"),
         Cl.stringAscii("NO"),
-        Cl.uint(200) // end-time
+        Cl.uint(10000) // end-time
       ],
       deployer
     );
@@ -30,7 +30,7 @@ describe('Prediction Market Contract', () => {
 
   it('allows users to bet on outcomes', () => {
     // 1. Create Market
-    simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("SPORTS"), Cl.stringAscii("Team A vs B"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(1000)], deployer);
+    simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("SPORTS"), Cl.stringAscii("Team A vs B"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(10000)], deployer);
 
     // 2. Place Bets
     const bet1 = simnet.callPublicFn(contract, "place-bet", [Cl.uint(1), Cl.stringAscii("A"), Cl.uint(1000)], wallet1);
@@ -52,7 +52,7 @@ describe('Prediction Market Contract', () => {
     simnet.callPublicFn(contract, "fund-treasury", [Cl.uint(100000)], deployer);
 
     // 1. Create Market
-    simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("WORLD"), Cl.stringAscii("Election?"), Cl.stringAscii("X"), Cl.stringAscii("Y"), Cl.uint(1000)], deployer);
+    simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("WORLD"), Cl.stringAscii("Election?"), Cl.stringAscii("X"), Cl.stringAscii("Y"), Cl.uint(10000)], deployer);
 
     // 2. Bet: Wallet1 bets 1000 on Win, Wallet2 bets 1000 on Loss
     simnet.callPublicFn(contract, "place-bet", [Cl.uint(1), Cl.stringAscii("X"), Cl.uint(1000)], wallet1);
@@ -83,9 +83,9 @@ describe('Prediction Market Contract', () => {
     // So if they claim, it records the loss and resets streak.
     const claim2 = simnet.callPublicFn(contract, "claim-winnings", [Cl.uint(1)], wallet2);
     expect(claim2).toBeOk(Cl.bool(true));
-    
+
     const stats2 = simnet.callReadOnlyFn(contract, "get-user-stats", [wallet2], deployer);
-     expect(stats2.result).toStrictEqual(Cl.tuple({
+    expect(stats2.result).toStrictEqual(Cl.tuple({
       "total-bets": Cl.uint(1),
       "total-wins": Cl.uint(0),
       "current-streak": Cl.uint(0),
@@ -98,32 +98,36 @@ describe('Prediction Market Contract', () => {
     // We can simulate a streak by manually setting data via multiple wins, 
     // or just trust the logic. Since we can't easily set private state without many txs, 
     // we will run a loop of fake markets.
-    
+
     simnet.callPublicFn(contract, "fund-treasury", [Cl.uint(1000000)], deployer);
 
     // Win 3 times to get streak 3 -> 10% bonus
     for (let i = 1; i <= 3; i++) {
-        simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("TEST"), Cl.stringAscii("Q"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(1000)], deployer);
-        simnet.callPublicFn(contract, "place-bet", [Cl.uint(i), Cl.stringAscii("A"), Cl.uint(1000)], wallet1);
-        simnet.callPublicFn(contract, "resolve-market", [Cl.uint(i), Cl.stringAscii("A")], deployer);
-        simnet.callPublicFn(contract, "claim-winnings", [Cl.uint(i)], wallet1);
+      simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("TEST"), Cl.stringAscii("Q"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(10000)], deployer);
+      simnet.callPublicFn(contract, "place-bet", [Cl.uint(i), Cl.stringAscii("A"), Cl.uint(1000)], wallet1);
+      simnet.callPublicFn(contract, "resolve-market", [Cl.uint(i), Cl.stringAscii("A")], deployer);
+      simnet.callPublicFn(contract, "claim-winnings", [Cl.uint(i)], wallet1);
     }
-    
+
     // Check Stats: Streak 3
     const stats = simnet.callReadOnlyFn(contract, "get-user-stats", [wallet1], deployer);
     // 3 wins. 
-    expect(stats.result).toBeTuple(expect.objectContaining({
-        "current-streak": Cl.uint(3)
+    expect(stats.result).toEqual(Cl.tuple({
+      "current-streak": Cl.uint(3),
+      "total-bets": Cl.uint(3),
+      "total-wins": Cl.uint(3),
+      "highest-streak": Cl.uint(3),
+      "total-earnings": Cl.uint(3000)
     }));
 
     // 4th Win -> calculated details
     // Market 4
-    simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("TEST"), Cl.stringAscii("Q"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(1000)], deployer);
+    simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("TEST"), Cl.stringAscii("Q"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(10000)], deployer);
     // Bet 1000 vs 1000 (total 2000)
     simnet.callPublicFn(contract, "place-bet", [Cl.uint(4), Cl.stringAscii("A"), Cl.uint(1000)], wallet1);
     simnet.callPublicFn(contract, "place-bet", [Cl.uint(4), Cl.stringAscii("B"), Cl.uint(1000)], wallet2); // Add loser to ensure pool is distinct
     simnet.callPublicFn(contract, "resolve-market", [Cl.uint(4), Cl.stringAscii("A")], deployer);
-    
+
     // Claim. Streak becomes 4. Multiplier is still for "4 / 3 = 1" -> 10%.
     // Base Share = 2000.
     // Bonus = (2000 * 10) / 100 = 200.
@@ -134,14 +138,17 @@ describe('Prediction Market Contract', () => {
     // ...
     // Total earnings from first 3 = 3000.
     // This claim adds 2200. Total = 5200.
-    
+
     const claim = simnet.callPublicFn(contract, "claim-winnings", [Cl.uint(4)], wallet1);
     expect(claim).toBeOk(Cl.bool(true));
 
     const finalStats = simnet.callReadOnlyFn(contract, "get-user-stats", [wallet1], deployer);
-    expect(finalStats.result).toBeTuple(expect.objectContaining({
-        "current-streak": Cl.uint(4),
-        "total-earnings": Cl.uint(5200)
+    expect(finalStats.result).toEqual(Cl.tuple({
+      "current-streak": Cl.uint(4),
+      "total-bets": Cl.uint(4),
+      "total-wins": Cl.uint(4),
+      "highest-streak": Cl.uint(4),
+      "total-earnings": Cl.uint(5200)
     }));
   });
 
