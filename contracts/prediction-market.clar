@@ -10,6 +10,8 @@
 (define-constant ERR-INSUFFICIENT-FUNDS (err u104))
 (define-constant ERR-INVALID-OUTCOME (err u105))
 (define-constant ERR-ALREADY-CLAIMED (err u106))
+(define-constant ERR-INVALID-MARKET-DATA (err u107))
+(define-constant ERR-INVALID-AMOUNT (err u108))
 
 ;; Categories
 (define-constant CATEGORY-CRYPTO "CRYPTO")
@@ -70,6 +72,11 @@
             (market-id (+ (var-get market-id-nonce) u1))
         )
         (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-AUTHORIZED)
+        (asserts! (> end-time block-height) ERR-MARKET-CLOSED)
+        (asserts! (> (len category) u0) ERR-INVALID-MARKET-DATA)
+        (asserts! (> (len question) u0) ERR-INVALID-MARKET-DATA)
+        (asserts! (> (len outcome-a) u0) ERR-INVALID-MARKET-DATA)
+        (asserts! (> (len outcome-b) u0) ERR-INVALID-MARKET-DATA)
         
         (map-set markets market-id {
             category: category,
@@ -264,6 +271,7 @@
         (
             (contract-address (as-contract tx-sender))
         )
+        (asserts! (> amount u0) ERR-INVALID-AMOUNT)
         (try! (stx-transfer? amount tx-sender contract-address))
         (var-set treasury-balance (+ (var-get treasury-balance) amount))
         (ok true)
