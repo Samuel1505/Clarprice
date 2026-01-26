@@ -30,17 +30,19 @@ describe('Prediction Market Contract', () => {
 
   it('allows users to bet on outcomes', () => {
     // 1. Create Market
-    simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("SPORTS"), Cl.stringAscii("Team A vs B"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(10000)], deployer);
+    const create = simnet.callPublicFn(contract, "create-market", [Cl.stringAscii("SPORTS"), Cl.stringAscii("Team A vs B"), Cl.stringAscii("A"), Cl.stringAscii("B"), Cl.uint(10000)], deployer);
+    // @ts-ignore
+    const marketId = create.result.value;
 
     // 2. Place Bets
-    const bet1 = simnet.callPublicFn(contract, "place-bet", [Cl.uint(1), Cl.stringAscii("A"), Cl.uint(1000)], wallet1);
+    const bet1 = simnet.callPublicFn(contract, "place-bet", [marketId, Cl.stringAscii("A"), Cl.uint(1000)], wallet1);
     expect(bet1).toBeOk(Cl.bool(true));
 
-    const bet2 = simnet.callPublicFn(contract, "place-bet", [Cl.uint(1), Cl.stringAscii("B"), Cl.uint(1000)], wallet2);
+    const bet2 = simnet.callPublicFn(contract, "place-bet", [marketId, Cl.stringAscii("B"), Cl.uint(1000)], wallet2);
     expect(bet2).toBeOk(Cl.bool(true));
 
     // 3. Verify Market Pools
-    const market = simnet.callReadOnlyFn(contract, "get-market", [Cl.uint(1)], deployer);
+    const market = simnet.callReadOnlyFn(contract, "get-market", [marketId], deployer);
     expect(market.result).toBeSome(expect.objectContaining({
       "pool-a": Cl.uint(1000),
       "pool-b": Cl.uint(1000)
