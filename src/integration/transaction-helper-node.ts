@@ -5,61 +5,42 @@
  */
 
 import {
-  AnchorMode,
   broadcastTransaction,
   makeContractCall,
-  makeStandardSTXPostCondition,
   PostConditionMode,
-  StacksTransaction,
+  StacksTransactionWire,
   standardPrincipalCV,
   stringAsciiCV,
   uintCV,
-  FungibleConditionCode,
+  StxPostCondition,
   getAddressFromPrivateKey,
-  TransactionVersion,
 } from '@stacks/transactions';
-
-export interface NetworkConfig {
-  address: string;
-  coreApiUrl: string;
-}
-
-export const TESTNET_CONFIG: NetworkConfig = {
-  address: 'https://api.testnet.hiro.so',
-  coreApiUrl: 'https://api.testnet.hiro.so',
-};
-
-export const MAINNET_CONFIG: NetworkConfig = {
-  address: 'https://api.hiro.so',
-  coreApiUrl: 'https://api.hiro.so',
-};
+import { StacksNetworkName } from '@stacks/network';
 
 /**
  * Node.js-compatible helper class for building and sending transactions
  * Use this for backend services, scripts, and automated transactions
  */
 export class TransactionHelperNode {
-  private network: NetworkConfig;
+  private network: StacksNetworkName;
 
   constructor(network: 'mainnet' | 'testnet' = 'testnet') {
-    this.network = network === 'mainnet' ? MAINNET_CONFIG : TESTNET_CONFIG;
+    this.network = network;
   }
 
   /**
    * Get the current network configuration
    */
-  getNetwork(): NetworkConfig {
+  getNetwork(): StacksNetworkName {
     return this.network;
   }
 
   /**
    * Get address from private key
    */
-  getAddressFromPrivateKey(privateKey: string, network: 'mainnet' | 'testnet' = 'testnet'): string {
-    const version = network === 'mainnet' 
-      ? TransactionVersion.Mainnet 
-      : TransactionVersion.Testnet;
-    return getAddressFromPrivateKey(privateKey, version);
+  getAddressFromPrivateKey(privateKey: string, network?: 'mainnet' | 'testnet'): string {
+    const networkParam = (network || this.network) as 'mainnet' | 'testnet';
+    return getAddressFromPrivateKey(privateKey, networkParam);
   }
 
   /**
@@ -71,7 +52,7 @@ export class TransactionHelperNode {
     functionName: string,
     functionArgs: any[],
     senderKey: string
-  ): Promise<StacksTransaction> {
+  ): Promise<StacksTransactionWire> {
     const txOptions = {
       contractAddress,
       contractName,
@@ -79,7 +60,6 @@ export class TransactionHelperNode {
       functionArgs,
       senderKey,
       network: this.network,
-      anchorMode: AnchorMode.Any,
       postConditionMode: PostConditionMode.Allow,
     };
 
@@ -127,8 +107,15 @@ export class TransactionHelperNode {
   ): Promise<string> {
     const senderAddress = this.getAddressFromPrivateKey(
       privateKey,
-      this.network === MAINNET_CONFIG ? 'mainnet' : 'testnet'
+      this.network as 'mainnet' | 'testnet'
     );
+
+    const postCondition: StxPostCondition = {
+      type: 'stx-postcondition',
+      address: senderAddress,
+      condition: 'eq',
+      amount: amount,
+    };
 
     const transaction = await makeContractCall({
       contractAddress,
@@ -141,15 +128,8 @@ export class TransactionHelperNode {
       ],
       senderKey: privateKey,
       network: this.network,
-      anchorMode: AnchorMode.Any,
       postConditionMode: PostConditionMode.Allow,
-      postConditions: [
-        makeStandardSTXPostCondition(
-          senderAddress,
-          FungibleConditionCode.Equal,
-          amount
-        ),
-      ],
+      postConditions: [postCondition],
     });
 
     return await this.broadcastTransaction(transaction);
@@ -207,8 +187,15 @@ export class TransactionHelperNode {
   ): Promise<string> {
     const senderAddress = this.getAddressFromPrivateKey(
       privateKey,
-      this.network === MAINNET_CONFIG ? 'mainnet' : 'testnet'
+      this.network as 'mainnet' | 'testnet'
     );
+
+    const postCondition: StxPostCondition = {
+      type: 'stx-postcondition',
+      address: senderAddress,
+      condition: 'eq',
+      amount: amount,
+    };
 
     const transaction = await makeContractCall({
       contractAddress,
@@ -217,15 +204,8 @@ export class TransactionHelperNode {
       functionArgs: [uintCV(amount)],
       senderKey: privateKey,
       network: this.network,
-      anchorMode: AnchorMode.Any,
       postConditionMode: PostConditionMode.Allow,
-      postConditions: [
-        makeStandardSTXPostCondition(
-          senderAddress,
-          FungibleConditionCode.Equal,
-          amount
-        ),
-      ],
+      postConditions: [postCondition],
     });
 
     return await this.broadcastTransaction(transaction);
@@ -234,9 +214,9 @@ export class TransactionHelperNode {
   /**
    * Broadcast a transaction
    */
-  async broadcastTransaction(transaction: StacksTransaction): Promise<string> {
-    const response = await broadcastTransaction(transaction, this.network);
-    if (response.error) {
+  async broadcastTransaction(transaction: StacksTransactionWire): Promise<string> {
+    const response = await broadcastTransaction({ transaction, network: this.network });
+    if ('error' in response) {
       throw new Error(`Transaction failed: ${response.error}`);
     }
     return response.txid;
@@ -252,14 +232,20 @@ export class TransactionHelperNode {
     functionArgs: any[],
     senderAddress: string
   ): Promise<any> {
-    const apiUrl = `${this.network.coreApiUrl}/v2/contracts/call-read/${contractAddress}/${contractName}/${functionName}`;
+    const baseUrl = this.network === 'mainnet' 
+      ? 'https://api.hiro.so' 
+      : 'https://api.testnet.hiro.so';
+    const apiUrl = `${baseUrl}/v2/contracts/call-read/${contractAddress}/${contractName}/${functionName}`;
 
+    const { serializeCV } = await import('@stacks/transactions');
     const serializedArgs = functionArgs.map(arg => {
       // Convert Cl values to hex
-      if (arg && typeof arg.serialize === 'function') {
-        return arg.serialize().toString('hex');
+      try {
+        const serialized = serializeCV(arg);
+        return Buffer.from(serialized).toString('hex');
+      } catch {
+        return arg;
       }
-      return arg;
     });
 
     const response = await fetch(apiUrl, {

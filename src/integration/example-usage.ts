@@ -8,11 +8,10 @@ import {
   Cl,
   makeContractCall,
   broadcastTransaction,
-  AnchorMode,
   PostConditionMode,
-  standardPrincipalCV,
   uintCV,
   stringAsciiCV,
+  serializeCV,
 } from '@stacks/transactions';
 
 /**
@@ -87,22 +86,18 @@ export async function exampleProgrammaticTransactions(
       uintCV(1000000), // amount in microSTX
     ],
     senderKey: privateKey,
-    network: {
-      address: 'https://api.testnet.hiro.so',
-      coreApiUrl: 'https://api.testnet.hiro.so',
-    },
-    anchorMode: AnchorMode.Any,
+    network: 'testnet',
     postConditionMode: PostConditionMode.Allow,
   });
 
   // Broadcast transaction
   try {
-    const txid = await broadcastTransaction(transaction, {
-      address: 'https://api.testnet.hiro.so',
-      coreApiUrl: 'https://api.testnet.hiro.so',
-    });
-    console.log('Transaction broadcasted:', txid);
-    return txid;
+    const response = await broadcastTransaction({ transaction, network: 'testnet' });
+    if ('error' in response) {
+      throw new Error(`Transaction failed: ${response.error}`);
+    }
+    console.log('Transaction broadcasted:', response.txid);
+    return response.txid;
   } catch (error) {
     console.error('Error broadcasting transaction:', error);
     throw error;
@@ -119,6 +114,10 @@ export async function exampleReadOnlyCalls(contractAddress: string) {
   const apiUrl = `https://api.testnet.hiro.so/v2/contracts/call-read/${contractAddress}/prediction-market/get-market`;
 
   try {
+    const marketIdCV = Cl.uint(marketId);
+    const serialized = serializeCV(marketIdCV);
+    const hexArg = Buffer.from(serialized).toString('hex');
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -126,7 +125,7 @@ export async function exampleReadOnlyCalls(contractAddress: string) {
       },
       body: JSON.stringify({
         sender: contractAddress,
-        arguments: [Cl.uint(marketId).serialize().toString('hex')],
+        arguments: [hexArg],
       }),
     });
 
@@ -161,19 +160,15 @@ export async function exampleCompleteWorkflow(
       uintCV(10000),
     ],
     senderKey: adminPrivateKey,
-    network: {
-      address: 'https://api.testnet.hiro.so',
-      coreApiUrl: 'https://api.testnet.hiro.so',
-    },
-    anchorMode: AnchorMode.Any,
+    network: 'testnet',
     postConditionMode: PostConditionMode.Allow,
   });
 
-  const createTxid = await broadcastTransaction(createMarketTx, {
-    address: 'https://api.testnet.hiro.so',
-    coreApiUrl: 'https://api.testnet.hiro.so',
-  });
-  console.log('Market created:', createTxid);
+  const createResponse = await broadcastTransaction({ transaction: createMarketTx, network: 'testnet' });
+  if ('error' in createResponse) {
+    throw new Error(`Transaction failed: ${createResponse.error}`);
+  }
+  console.log('Market created:', createResponse.txid);
 
   // Step 2: User places a bet
   const betTx = await makeContractCall({
@@ -186,19 +181,15 @@ export async function exampleCompleteWorkflow(
       uintCV(1000000), // 1 STX
     ],
     senderKey: userPrivateKey,
-    network: {
-      address: 'https://api.testnet.hiro.so',
-      coreApiUrl: 'https://api.testnet.hiro.so',
-    },
-    anchorMode: AnchorMode.Any,
+    network: 'testnet',
     postConditionMode: PostConditionMode.Allow,
   });
 
-  const betTxid = await broadcastTransaction(betTx, {
-    address: 'https://api.testnet.hiro.so',
-    coreApiUrl: 'https://api.testnet.hiro.so',
-  });
-  console.log('Bet placed:', betTxid);
+  const betResponse = await broadcastTransaction({ transaction: betTx, network: 'testnet' });
+  if ('error' in betResponse) {
+    throw new Error(`Transaction failed: ${betResponse.error}`);
+  }
+  console.log('Bet placed:', betResponse.txid);
 
   // Step 3: Admin resolves market
   const resolveTx = await makeContractCall({
@@ -210,19 +201,15 @@ export async function exampleCompleteWorkflow(
       stringAsciiCV('A'),
     ],
     senderKey: adminPrivateKey,
-    network: {
-      address: 'https://api.testnet.hiro.so',
-      coreApiUrl: 'https://api.testnet.hiro.so',
-    },
-    anchorMode: AnchorMode.Any,
+    network: 'testnet',
     postConditionMode: PostConditionMode.Allow,
   });
 
-  const resolveTxid = await broadcastTransaction(resolveTx, {
-    address: 'https://api.testnet.hiro.so',
-    coreApiUrl: 'https://api.testnet.hiro.so',
-  });
-  console.log('Market resolved:', resolveTxid);
+  const resolveResponse = await broadcastTransaction({ transaction: resolveTx, network: 'testnet' });
+  if ('error' in resolveResponse) {
+    throw new Error(`Transaction failed: ${resolveResponse.error}`);
+  }
+  console.log('Market resolved:', resolveResponse.txid);
 
   // Step 4: User claims winnings
   const claimTx = await makeContractCall({
@@ -231,17 +218,13 @@ export async function exampleCompleteWorkflow(
     functionName: 'claim-winnings',
     functionArgs: [uintCV(1)],
     senderKey: userPrivateKey,
-    network: {
-      address: 'https://api.testnet.hiro.so',
-      coreApiUrl: 'https://api.testnet.hiro.so',
-    },
-    anchorMode: AnchorMode.Any,
+    network: 'testnet',
     postConditionMode: PostConditionMode.Allow,
   });
 
-  const claimTxid = await broadcastTransaction(claimTx, {
-    address: 'https://api.testnet.hiro.so',
-    coreApiUrl: 'https://api.testnet.hiro.so',
-  });
-  console.log('Winnings claimed:', claimTxid);
+  const claimResponse = await broadcastTransaction({ transaction: claimTx, network: 'testnet' });
+  if ('error' in claimResponse) {
+    throw new Error(`Transaction failed: ${claimResponse.error}`);
+  }
+  console.log('Winnings claimed:', claimResponse.txid);
 }

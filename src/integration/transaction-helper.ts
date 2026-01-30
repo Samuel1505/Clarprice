@@ -5,17 +5,13 @@
  */
 
 import {
-  AnchorMode,
   broadcastTransaction,
   makeContractCall,
-  makeStandardSTXPostCondition,
   PostConditionMode,
-  StacksTransaction,
-  standardPrincipalCV,
+  StacksTransactionWire,
   stringAsciiCV,
   uintCV,
-  createAssetInfo,
-  FungibleConditionCode,
+  StxPostCondition,
 } from '@stacks/transactions';
 import {
   openContractCall,
@@ -27,16 +23,10 @@ import {
 } from '@stacks/connect';
 
 // Network configuration
-export const appConfig: AppConfig = {
-  appDetails: {
-    name: 'Clarprice Prediction Market',
-    icon: window.location.origin + '/logo.png',
-  },
-  // Use testnet for development, mainnet for production
-  network: {
-    address: 'https://api.testnet.hiro.so',
-    coreApiUrl: 'https://api.testnet.hiro.so',
-  },
+export const appConfig = new AppConfig();
+export const appDetails = {
+  name: 'Clarprice Prediction Market',
+  icon: window.location.origin + '/logo.png',
 };
 
 /**
@@ -104,19 +94,14 @@ export class TransactionHelper {
     functionArgs: any[],
     senderKey: string,
     network: 'mainnet' | 'testnet' = 'testnet'
-  ): Promise<StacksTransaction> {
-    const networkConfig = network === 'mainnet'
-      ? { address: 'https://api.hiro.so', coreApiUrl: 'https://api.hiro.so' }
-      : { address: 'https://api.testnet.hiro.so', coreApiUrl: 'https://api.testnet.hiro.so' };
-
+  ): Promise<StacksTransactionWire> {
     const txOptions = {
       contractAddress,
       contractName,
       functionName,
       functionArgs,
       senderKey,
-      network: networkConfig,
-      anchorMode: AnchorMode.Any,
+      network,
       postConditionMode: PostConditionMode.Allow,
     };
 
@@ -149,8 +134,8 @@ export class TransactionHelper {
         stringAsciiCV(outcomeB),
         uintCV(endTime),
       ],
-      network: appConfig.network,
-      appDetails: appConfig.appDetails,
+      network: 'testnet',
+      appDetails: appDetails,
       onFinish: (data) => {
         console.log('Transaction submitted:', data);
       },
@@ -174,6 +159,13 @@ export class TransactionHelper {
       throw new Error('User not authenticated');
     }
 
+    const postCondition: StxPostCondition = {
+      type: 'stx-postcondition',
+      address: userData.profile.stxAddress.testnet,
+      condition: 'eq',
+      amount: amount,
+    };
+
     await openContractCall({
       contractAddress,
       contractName: 'prediction-market',
@@ -183,15 +175,9 @@ export class TransactionHelper {
         stringAsciiCV(outcome),
         uintCV(amount),
       ],
-      network: appConfig.network,
-      appDetails: appConfig.appDetails,
-      postConditions: [
-        makeStandardSTXPostCondition(
-          userData.profile.stxAddress.testnet,
-          FungibleConditionCode.Equal,
-          amount
-        ),
-      ],
+      network: 'testnet',
+      appDetails: appDetails,
+      postConditions: [postCondition],
       onFinish: (data) => {
         console.log('Bet placed:', data);
       },
@@ -213,8 +199,8 @@ export class TransactionHelper {
       contractName: 'prediction-market',
       functionName: 'claim-winnings',
       functionArgs: [uintCV(marketId)],
-      network: appConfig.network,
-      appDetails: appConfig.appDetails,
+      network: 'testnet',
+      appDetails: appDetails,
       onFinish: (data) => {
         console.log('Winnings claimed:', data);
       },
@@ -240,8 +226,8 @@ export class TransactionHelper {
         uintCV(marketId),
         stringAsciiCV(winningOutcome),
       ],
-      network: appConfig.network,
-      appDetails: appConfig.appDetails,
+      network: 'testnet',
+      appDetails: appDetails,
       onFinish: (data) => {
         console.log('Market resolved:', data);
       },
@@ -266,8 +252,8 @@ export class TransactionHelper {
     await openSTXTransfer({
       recipient,
       amount: amount.toString(),
-      network: appConfig.network,
-      appDetails: appConfig.appDetails,
+      network: 'testnet',
+      appDetails: appDetails,
       onFinish: (data) => {
         console.log('STX transferred:', data);
       },
@@ -282,14 +268,13 @@ export class TransactionHelper {
    * (Useful for programmatic transactions with private keys)
    */
   async broadcastTransaction(
-    transaction: StacksTransaction,
+    transaction: StacksTransactionWire,
     network: 'mainnet' | 'testnet' = 'testnet'
   ): Promise<string> {
-    const networkConfig = network === 'mainnet'
-      ? { address: 'https://api.hiro.so', coreApiUrl: 'https://api.hiro.so' }
-      : { address: 'https://api.testnet.hiro.so', coreApiUrl: 'https://api.testnet.hiro.so' };
-
-    const response = await broadcastTransaction(transaction, networkConfig);
+    const response = await broadcastTransaction({ transaction, network });
+    if ('error' in response) {
+      throw new Error(`Transaction failed: ${response.error}`);
+    }
     return response.txid;
   }
 }
